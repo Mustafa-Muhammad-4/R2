@@ -106,10 +106,11 @@ main{max-width:1100px;margin:auto;padding:14px}
 .meta{display:flex;justify-content:space-between;gap:8px;font-size:.84rem;color:var(--mute)}
 .meta b{color:var(--text)}
 
-.row{display:flex;gap:8px;align-items:stretch}
-.stepper{display:flex;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.stepper button{background:transparent;border:0;width:40px;font-size:1.3rem;font-weight:800;color:var(--cyan)}
-.stepper input{width:52px;text-align:center;background:transparent;border:0;outline:0;font-weight:700;
+.row{display:flex;flex-direction:column;gap:8px}
+@media(min-width:480px){.row{flex-direction:row;align-items:stretch}}
+.stepper{display:flex;flex:1;justify-content:space-between;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stepper button{background:transparent;border:0;width:48px;height:40px;font-size:1.3rem;font-weight:800;color:var(--cyan)}
+.stepper input{flex:1;min-width:40px;text-align:center;background:transparent;border:0;outline:0;font-weight:700;
   -webkit-user-select:text;user-select:text;-moz-appearance:textfield}
 .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 select{
@@ -123,6 +124,15 @@ select{
   background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:.88rem}
 .orders .rm{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;width:30px;height:30px;font-weight:800}
 .orders .empty-o{color:var(--mute);justify-content:center;border-style:dashed}
+
+.menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap: 6px; }
+.menu-btn { 
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px; 
+  text-align: center; font-size: .75rem; color: var(--mute); font-weight: 700; cursor: pointer;
+  transition: .1s; -webkit-tap-highlight-color: transparent;
+}
+.menu-btn:active { background: var(--line); border-color: var(--cyan); transform: scale(0.92); }
+.menu-btn b { display: block; font-size: .85rem; color: var(--text); margin-bottom: 2px; line-height: 1.1; }
 
 .total-bar{display:flex;justify-content:space-between;align-items:center;
   padding:10px 12px;border-radius:14px;background:rgba(255,43,214,.08);border:1px solid rgba(255,43,214,.4)}
@@ -197,11 +207,24 @@ nav .cnt{display:inline-block;min-width:22px;padding:0 6px;margin-inline-start:6
 
   <section id="view-log" class="view">
     <h2 style="margin:0 0 12px">📋 يومية الوردية</h2>
+
+    <div class="box" style="margin-bottom:14px;border-color:var(--amber)">
+      <div class="box-title" style="color:var(--amber)">⚡ مصاريف الكهرباء</div>
+      <div class="row" style="flex-direction:row">
+        <input type="number" id="elecInput" placeholder="شحنت بكام؟ (مثال: 100)" style="flex:1;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;color:var(--text);outline:0" min="0" inputmode="numeric">
+        <button class="btn btn-cyan" data-action="saveElec">تسجيل</button>
+      </div>
+      <div class="small-line" style="margin-top:8px">
+        <span>المسجل حالياً: <b id="elecDisplay">0 ج.م</b></span>
+        <button class="btn-ghost" data-action="clearElec" style="border:0;color:var(--red);padding:0 8px;font-size:1.1rem;cursor:pointer" aria-label="تصفير">🗑 تصفير</button>
+      </div>
+    </div>
+
     <div class="sum-grid" id="logSummary"></div>
     <p class="hint" style="margin:-6px 0 12px;color:var(--mute)">تفاصيل الوقت والماتشات والكانتين قبل التقريب، والإجمالي بعد التقريب لأقرب 5 جنيه.</p>
     <div class="log-list" id="logList"></div>
     <div class="danger-zone">
-      <button class="btn btn-red block" data-action="endDay">🔒 تقفيل اليوم ومسح السجل</button>
+      <button class="btn btn-red block" data-action="endDay">🔒 إرسال التقرير وتقفيل اليوم</button>
     </div>
   </section>
 </main>
@@ -226,6 +249,7 @@ const TYPE_AR = { single:'فردي', multi:'مالطي' };
 const DEVICE_COUNT = 5;
 const K_DEV = 'psc_devices_v1';
 const K_LOG = 'psc_log_v1';
+const K_ELEC= 'psc_elec_v1';
 
 /* ---------------- تخزين ---------------- */
 const $ = (s, r=document) => r.querySelector(s);
@@ -239,11 +263,12 @@ function save(){
   try {
     localStorage.setItem(K_DEV, JSON.stringify(devices));
     localStorage.setItem(K_LOG, JSON.stringify(log));
+    localStorage.setItem(K_ELEC, JSON.stringify(electricity));
   } catch(e){ toast('⚠️ تحذير: مش قادر أحفظ البيانات على الموبايل!'); }
 }
 
 function newDevice(id){
-  return { id, type:'single', running:false, startTs:null, accMs:0, matches:0, orders:[] };
+  return { id, type:'single', running:false, startTs:null, accMs:0, matches:0, orders:[], history:[] };
 }
 function sanitize(id, s){
   const d = newDevice(id);
@@ -257,6 +282,7 @@ function sanitize(id, s){
     ? s.orders.filter(o => o && menuItem(o.id) && Number.isInteger(o.qty) && o.qty > 0)
               .map(o => ({ id:o.id, qty:o.qty }))
     : [];
+  d.history = Array.isArray(s.history) ? s.history : [];
   return d;
 }
 function initDevices(){
@@ -272,19 +298,40 @@ function initDevices(){
 let devices = initDevices();
 let log = load(K_LOG, []);
 if (!Array.isArray(log)) log = [];
+let electricity = load(K_ELEC, 0);
 
 /* ---------------- حسابات ---------------- */
 const getDev   = id => devices.find(d => d.id === id);
 const elapsed  = d => d.accMs + (d.running ? Math.max(0, Date.now() - d.startTs) : 0);
-const timeCost = d => elapsed(d) / 3600000 * PRICES.hour[d.type];
-const matchCost= d => d.matches * PRICES.match[d.type];
+const totalMs  = d => elapsed(d) + d.history.reduce((s, h) => s + h.ms, 0);
+const totalMatches = d => d.matches + d.history.reduce((s, h) => s + h.matches, 0);
+
+const timeCost = d => {
+  const c = elapsed(d) / 3600000 * PRICES.hour[d.type];
+  const h = d.history.reduce((s, x) => s + (x.ms / 3600000 * PRICES.hour[x.type]), 0);
+  return c + h;
+};
+const matchCost = d => {
+  const c = d.matches * PRICES.match[d.type];
+  const h = d.history.reduce((s, x) => s + (x.matches * PRICES.match[x.type]), 0);
+  return c + h;
+};
 const itemsCost= d => d.orders.reduce((s, o) => s + o.qty * menuItem(o.id).price, 0);
 const subtotal = d => Math.round((timeCost(d) + matchCost(d) + itemsCost(d)) * 100) / 100;
-// تقريب لأقرب 5 جنيه (لو بالظبط في النص ينزل لتحت: 17.5 ← 15، 18 ← 20)
 const roundTo5 = n => Math.ceil(Math.round(n * 100) / 100 / 5 - 0.5) * 5;
-// أي حساب أكبر من صفر أقل حاجة فيه 5 جنيه
-const total    = d => { const s = subtotal(d); return s > 0 ? Math.max(5, roundTo5(s)) : 0; };
-const hasStuff = d => d.running || d.accMs > 0 || d.matches > 0 || d.orders.length > 0;
+const total    = d => { 
+  const s = subtotal(d); 
+  if (s <= 0) return 0;
+
+  // فترة سماح 5 دقايق لو مفيش أي طلبات أو ماتشات
+  if (totalMs(d) <= 5 * 60000 && totalMatches(d) === 0 && d.orders.length === 0) {
+    return 0;
+  }
+
+  const minCharge = totalMatches(d) > 0 ? 7.5 : 5;
+  return Math.max(minCharge, roundTo5(s)); 
+};
+const hasStuff = d => d.running || d.accMs > 0 || d.matches > 0 || d.orders.length > 0 || d.history.length > 0;
 
 function pad(n){ return String(n).padStart(2,'0'); }
 function hms(ms){
@@ -306,33 +353,21 @@ const egp = n => fmt(n) + ' ج.م';
 /* ---------------- واجهة الجهاز ---------------- */
 function statusOf(d){
   if (d.running) return { cls:'run',   txt:'شغال ▶' };
-  if (d.accMs > 0) return { cls:'pause', txt:'واقف مؤقتاً ⏸' };
+  if (d.accMs > 0 || d.history.length > 0) return { cls:'pause', txt:'واقف مؤقتاً ⏸' };
   if (hasStuff(d)) return { cls:'busy',  txt:'عليه حساب' };
   return { cls:'', txt:'فاضي' };
 }
-function isLocked(d){ return d.running || d.accMs > 0 || d.matches > 0; }
-
-let openId = null;
-function toggleLabel(d){
-  const nItems = d.orders.reduce((s, o) => s + o.qty, 0);
-  const parts = [];
-  if (d.matches) parts.push(d.matches + ' ماتش');
-  if (nItems) parts.push(nItems + ' طلب');
-  return (openId === d.id ? '▲ ' : '▼ ') + 'الماتشات والكانتين' + (parts.length ? ' (' + parts.join(' · ') + ')' : '');
-}
 
 function deviceHTML(d){
-  const locked = isLocked(d);
   const st = statusOf(d);
-  const open = openId === d.id;
   const orders = d.orders.length
     ? d.orders.map(o => {
         const m = menuItem(o.id);
-        return `<li><span>${m.name} × ${o.qty}</span>
+        return `<li><span>${m.name} × <b>${o.qty}</b></span>
           <span><b>${fmt(o.qty * m.price)}</b> ج.م
           <button class="rm" data-action="removeOrder" data-id="${d.id}" data-oid="${o.id}" aria-label="شيل واحدة">−</button></span></li>`;
       }).join('')
-    : '<li class="empty-o">مفيش طلبات</li>';
+    : '<li class="empty-o">الكانتين فاضي</li>';
 
   return `
   <div class="card-head">
@@ -341,60 +376,50 @@ function deviceHTML(d){
   </div>
 
   <div class="seg">
-    <button class="${d.type==='single'?'on':''}" data-action="setType" data-id="${d.id}" data-type="single" ${locked?'disabled':''}>
+    <button class="${d.type==='single'?'on':''}" data-action="setType" data-id="${d.id}" data-type="single">
       فردي <small>${fmt(PRICES.hour.single)} ج/ساعة</small></button>
-    <button class="${d.type==='multi'?'on':''}" data-action="setType" data-id="${d.id}" data-type="multi" ${locked?'disabled':''}>
+    <button class="${d.type==='multi'?'on':''}" data-action="setType" data-id="${d.id}" data-type="multi">
       مالطي <small>${fmt(PRICES.hour.multi)} ج/ساعة</small></button>
   </div>
-  <p class="hint ${locked?'':'hidden'}" data-role="hint">نوع اللعب مقفول لحد ما تحاسب الجهاز</p>
+  ${d.history.length > 0 ? '<p class="hint" style="color:var(--cyan);margin-top:6px">🔄 الجهاز ميكس (أوقات فردي ومالطي)</p>' : ''}
 
   <div class="box">
     <div class="timer" dir="ltr" data-live="timer">00:00:00</div>
     <div class="meta">
-      <span>الوقت: <b data-live="mins">0</b> دقيقة</span>
-      <span>حساب الوقت: <b data-live="tcost">0</b> ج.م</span>
+      <span>الوقت: <b data-live="mins">0</b> د</span>
+      <span>الحساب: <b data-live="tcost">0</b> ج.م</span>
     </div>
-    <button class="btn block ${d.running?'btn-red':'btn-green'}" data-action="toggleTime" data-id="${d.id}">
+    <button class="btn block ${d.running?'btn-red':'btn-green'}" data-action="toggleTime" data-id="${d.id}" style="font-size:1.1rem;padding:14px">
       ${d.running ? '⏹ إيقاف الوقت' : (d.accMs>0 ? '▶ كمّل الوقت' : '▶ بدأ الوقت')}
     </button>
   </div>
 
-  <div class="total-bar"><span>الإجمالي</span><b><span data-live="total" style="color:inherit;font-size:inherit">0</span> ج.م</b></div>
-
-  <button class="btn btn-ghost block" data-action="toggleOpen" data-id="${d.id}" data-role="tog">${toggleLabel(d)}</button>
-
-  <div class="details ${open ? '' : 'hidden'}">
+  <div class="details">
     <div class="box">
       <div class="box-title">🎯 الماتشات</div>
-      <div class="row">
-        <div class="stepper" style="flex:1;justify-content:space-between">
-          <button data-action="matchDec" data-id="${d.id}" aria-label="نقص">−</button>
-          <input type="number" inputmode="numeric" min="0" max="999" value="${d.matches}" data-role="matches" data-id="${d.id}" aria-label="عدد الماتشات">
-          <button data-action="matchInc" data-id="${d.id}" aria-label="زوّد">+</button>
+      <div class="row" style="flex-direction:row">
+        <div class="stepper" style="flex:1">
+          <button data-action="matchDec" data-id="${d.id}">−</button>
+          <input type="number" inputmode="numeric" min="0" max="999" value="${d.matches}" data-role="matches" data-id="${d.id}">
+          <button data-action="matchInc" data-id="${d.id}">+</button>
         </div>
       </div>
-      <div class="small-line"><span>عدد الماتشات (${fmt(PRICES.match[d.type])} ج للماتش)</span><span>الحساب: <b data-live="mcost">0</b> ج.م</span></div>
+      <div class="small-line"><span>حساب الماتشات</span><span><b data-live="mcost">0</b> ج.م</span></div>
     </div>
 
     <div class="box">
-      <div class="box-title">🥤 الكانتين</div>
-      <div class="row">
-        <select data-role="item" aria-label="اختار الطلب">
-          ${MENU.map(m => `<option value="${m.id}">${m.name} — ${fmt(m.price)} ج.م</option>`).join('')}
-        </select>
-        <div class="stepper">
-          <button data-action="qtyDec" aria-label="نقص الكمية">−</button>
-          <input type="number" inputmode="numeric" min="1" max="50" value="1" data-role="qty" aria-label="الكمية">
-          <button data-action="qtyInc" aria-label="زوّد الكمية">+</button>
-        </div>
+      <div class="box-title">🥤 الكانتين (دوس للإضافة السريعة)</div>
+      <div class="menu-grid">
+        ${MENU.map(m => `<button class="menu-btn" data-action="quickAdd" data-id="${d.id}" data-item="${m.id}"><b>${m.name}</b>${fmt(m.price)} ج</button>`).join('')}
       </div>
-      <button class="btn btn-cyan block" data-action="addOrder" data-id="${d.id}">➕ إضافة طلب</button>
       <ul class="orders">${orders}</ul>
       <div class="small-line"><span>حساب الكانتين</span><span><b data-live="icost">0</b> ج.م</span></div>
     </div>
   </div>
 
-  <button class="btn btn-pink block" data-action="checkout" data-id="${d.id}">💰 تصفية وحساب الجهاز</button>
+  <div class="total-bar" style="margin-top:8px"><span>الإجمالي (أقل حساب ${d.matches > 0 ? '7.5' : '5'})</span><b><span data-live="total" style="color:inherit;font-size:inherit">0</span> ج.م</b></div>
+
+  <button class="btn btn-pink block" data-action="checkout" data-id="${d.id}" style="margin-top:8px;font-size:1.15rem">💰 تصفية وحساب الجهاز</button>
   `;
 }
 
@@ -428,7 +453,7 @@ function updateLive(){
   devices.forEach(d => {
     const c = document.getElementById('dev-' + d.id);
     if (!c) return;
-    const ms = elapsed(d);
+    const ms = totalMs(d);
     setLive(c, 'timer', hms(ms));
     setLive(c, 'mins',  Math.floor(ms / 60000));
     setLive(c, 'tcost', fmt(timeCost(d)));
@@ -445,7 +470,6 @@ function syncLock(d){
   c.querySelectorAll('.seg button').forEach(b => b.disabled = locked);
   const h = c.querySelector('[data-role="hint"]');
   if (h) h.classList.toggle('hidden', !locked);
-  const tg = c.querySelector('[data-role="tog"]'); if (tg) tg.textContent = toggleLabel(d);
 }
 function updateHeader(){
   $('#hdrActive').textContent = devices.filter(d => d.running).length;
@@ -496,16 +520,16 @@ function checkout(id){
   const wasRunning = d.running;
   if (wasRunning) { stopTime(d); save(); renderDevice(id); }
 
-  const ms = elapsed(d);
+  const ms = totalMs(d);
   const rec = {
     id: Date.now(),
     ts: Date.now(),
     device: d.id,
-    type: d.type,
+    type: d.history.length ? 'mix' : d.type,
     ms,
     minutes: Math.floor(ms / 60000),
     timeCost: timeCost(d),
-    matches: d.matches,
+    matches: totalMatches(d),
     matchCost: matchCost(d),
     items: d.orders.map(o => { const m = menuItem(o.id); return { name:m.name, qty:o.qty, price:m.price }; }),
     itemsCost: itemsCost(d),
@@ -517,6 +541,21 @@ function checkout(id){
     toast('الجهاز فاضي — مفيش حاجة تتحاسب'); return;
   }
 
+  let breakdown = '';
+  if (d.history.length) {
+    breakdown = `<div class="rc-sub" style="color:var(--cyan);margin-top:2px">تفاصيل الميكس:</div>`;
+    [...d.history, { type: d.type, ms: elapsed(d), matches: d.matches }].forEach(p => {
+      if (p.ms > 0 || p.matches > 0) {
+        const m = Math.floor(p.ms / 60000);
+        const tc = p.ms / 3600000 * PRICES.hour[p.type];
+        const mc = p.matches * PRICES.match[p.type];
+        breakdown += `<div class="rc-sub" style="font-size:.72rem">● ${TYPE_AR[p.type]}: ${m} دقيقة (${fmt(tc)} ج) + ${p.matches} ماتش (${fmt(mc)} ج)</div>`;
+      }
+    });
+  } else {
+    breakdown = `<div class="rc-sub">${rec.minutes} دقيقة × ${PRICES.hour[d.type]} ج/ساعة</div>`;
+  }
+
   const itemLines = rec.items.length
     ? rec.items.map(i => `<div class="rc-line"><span>${i.name} × ${i.qty}</span><b>${i.qty * i.price} ج.م</b></div>`).join('')
     : '<div class="rc-line"><span>مفيش طلبات كانتين</span><b>0 ج.م</b></div>';
@@ -524,10 +563,10 @@ function checkout(id){
   showModal({
     title: '🧾 فاتورة جهاز ' + d.id,
     body: `
-      <div class="rc-line"><span>نوع اللعب</span><b>${TYPE_AR[rec.type]}</b></div>
+      <div class="rc-line"><span>نوع اللعب</span><b>${d.history.length ? 'ميكس' : TYPE_AR[rec.type]}</b></div>
       <div class="rc-line"><span>الوقت (${hms(rec.ms)})</span><b>${egp(rec.timeCost)}</b></div>
-      <div class="rc-sub">${rec.minutes} دقيقة × ${PRICES.hour[rec.type]} ج/ساعة</div>
-      <div class="rc-line"><span>الماتشات (${rec.matches} × ${PRICES.match[rec.type]})</span><b>${egp(rec.matchCost)}</b></div>
+      ${breakdown}
+      <div class="rc-line"><span>الماتشات (${rec.matches})</span><b>${egp(rec.matchCost)}</b></div>
       ${itemLines}
       ${rec.subtotal !== rec.total ? `<div class="rc-line"><span>المجموع</span><b>${egp(rec.subtotal)}</b></div><div class="rc-sub">بيتقرّب لأقرب 5 جنيه</div>` : ''}
       <div class="rc-total"><span>الإجمالي</span><b>${egp(rec.total)}</b></div>
@@ -555,8 +594,20 @@ function renderLog(){
     a.matches += e.matches; a.mins += e.minutes; return a;
   }, { total:0, time:0, match:0, items:0, matches:0, mins:0 });
 
-  $('#logSummary').innerHTML = `
-    <div class="sum big"><span>إجمالي الحساب</span><b>${egp(sum.total)}</b></div>
+  const ed = $('#elecDisplay'); if (ed) ed.textContent = egp(electricity);
+
+  let topHtml = `<div class="sum big"><span>إجمالي الحساب</span><b>${egp(sum.total)}</b></div>`;
+  if (electricity > 0) {
+    topHtml = `
+      <div class="sum big" style="border-color:var(--amber);box-shadow:0 0 18px rgba(255,184,0,.15)">
+        <span>الصافي (بعد الكهرباء)</span><b style="color:var(--amber);text-shadow:0 0 14px rgba(255,184,0,.5)">${egp(sum.total - electricity)}</b>
+      </div>
+      <div class="sum"><span>الإيراد</span><b>${egp(sum.total)}</b></div>
+      <div class="sum"><span>الكهرباء</span><b style="color:var(--red)">- ${egp(electricity)}</b></div>
+    `;
+  }
+
+  $('#logSummary').innerHTML = topHtml + `
     <div class="sum"><span>عدد الحسابات</span><b>${log.length}</b></div>
     <div class="sum"><span>إجمالي الوقت</span><b>${egp(sum.time)}</b></div>
     <div class="sum"><span>إجمالي الماتشات (${sum.matches})</span><b>${egp(sum.match)}</b></div>
@@ -566,7 +617,7 @@ function renderLog(){
     ? log.slice().reverse().map(e => `
       <div class="entry">
         <div class="entry-head">
-          <b>جهاز ${e.device} · ${TYPE_AR[e.type]}</b>
+          <b>جهاز ${e.device} · ${e.type === 'mix' ? 'ميكس' : TYPE_AR[e.type]}</b>
           <span class="t">${egp(e.total)}</span>
         </div>
         <div class="time">${dateStr(e.ts)} — ${clock12(e.ts)}</div>
@@ -580,16 +631,42 @@ function renderLog(){
 }
 
 function endDay(){
-  if (!log.length && !devices.some(hasStuff)) { toast('السجل فاضي أصلاً'); return; }
-  const total = log.reduce((s, e) => s + e.total, 0);
-  let msg = '⚠️ تحذير!\n\nهتمسح سجل اليومية بالكامل (' + log.length + ' حساب — إجمالي ' + fmt(total) + ' ج.م).\nالعملية دي مش ممكن ترجع فيها.';
+  if (!log.length && !devices.some(hasStuff) && electricity === 0) { toast('السجل فاضي أصلاً'); return; }
+  
+  const sum = log.reduce((a, e) => {
+    a.total += e.total; a.time += e.timeCost; a.match += e.matchCost; a.items += e.itemsCost;
+    a.matches += e.matches; a.mins += e.minutes; return a;
+  }, { total:0, time:0, match:0, items:0, matches:0, mins:0 });
+
+  let msg = '⚠️ تحذير!\n\nهتقفل الوردية وهتتبعت رسالة واتساب بالتقرير، وبعدها السجل هيتمسح.\nالعملية دي مش ممكن ترجع فيها.';
   if (devices.some(hasStuff)) msg += '\n\nملحوظة: فيه أجهزة لسه عليها حساب مفتوح — دي مش هتتمسح.';
   msg += '\n\nمتأكد إنك عايز تقفل اليوم؟';
+
   if (window.confirm(msg)) {
+    let text = `*ملخص الوردية - ${dateStr(Date.now())}*\n`;
+    text += `------------------------\n`;
+    if (electricity > 0) {
+      text += `💰 الإجمالي قبل الخصم: *${fmt(sum.total)}* جنيه\n`;
+      text += `⚡ خصم الكهرباء: *${fmt(electricity)}* جنيه\n`;
+      text += `💵 الصافي (بعد الخصم): *${fmt(sum.total - electricity)}* جنيه\n`;
+    } else {
+      text += `💰 الإجمالي: *${fmt(sum.total)}* جنيه\n`;
+    }
+    text += `📝 عدد الحسابات: ${log.length}\n`;
+    text += `⏱️ حساب الوقت: ${fmt(sum.time)} جنيه\n`;
+    text += `🎮 حساب الماتشات: ${fmt(sum.match)} جنيه\n`;
+    text += `🥤 حساب الكانتين: ${fmt(sum.items)} جنيه\n`;
+    text += `------------------------\n`;
+    text += `R2 PlayStation System`;
+
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+
     log = [];
+    electricity = 0;
     save();
     renderLog();
-    toast('تم تقفيل اليوم ✅');
+    toast('تم إرسال التقرير وتقفيل اليوم ✅');
   }
 }
 
@@ -639,15 +716,24 @@ document.addEventListener('click', e => {
 
   switch (a){
     case 'view': showView(b.dataset.view); break;
-    case 'toggleOpen': {
-      const prev = openId;
-      openId = (openId === id) ? null : id;
-      if (prev && prev !== id) renderDevice(prev);
-      renderDevice(id); break;
-    }
     case 'setType': {
-      const d = getDev(id); if (isLocked(d)) return;
-      d.type = b.dataset.type; save(); renderDevice(id); break;
+      const d = getDev(id);
+      const newType = b.dataset.type;
+      if (d.type === newType) break;
+      
+      if (d.running || d.accMs > 0 || d.matches > 0) {
+        if (confirm(`تغيير اللعب لـ ${newType === 'multi' ? 'مالطي' : 'فردي'}؟\n\nالوقت والماتشات اللي فاتت هتتحسب على السعر القديم، ونبدأ بالسعر الجديد من دلوقتي.`)) {
+          d.history.push({ type: d.type, ms: elapsed(d), matches: d.matches });
+          d.accMs = 0;
+          d.matches = 0;
+          if (d.running) d.startTs = Date.now();
+          d.type = newType;
+          save(); renderDevice(id);
+        }
+      } else {
+        d.type = newType; save(); renderDevice(id);
+      }
+      break;
     }
     case 'toggleTime': {
       const d = getDev(id);
@@ -660,17 +746,28 @@ document.addEventListener('click', e => {
       const inp = b.parentElement.querySelector('input'); if (inp) inp.value = d.matches;
       save(); updateLive(); syncLock(d); break;
     }
-    case 'qtyInc': case 'qtyDec': {
-      const inp = b.parentElement.querySelector('input');
-      let v = parseInt(inp.value, 10); if (!Number.isInteger(v)) v = 1;
-      inp.value = Math.max(1, Math.min(50, v + (a === 'qtyInc' ? 1 : -1))); break;
-    }
-    case 'addOrder': {
-      const card = b.closest('.card');
-      addOrder(id, card.querySelector('[data-role="item"]').value, card.querySelector('[data-role="qty"]').value); break;
+    case 'quickAdd': {
+      addOrder(id, b.dataset.item, 1);
+      break;
     }
     case 'removeOrder': removeOrder(id, b.dataset.oid); break;
     case 'checkout': checkout(id); break;
+    case 'saveElec': {
+      const v = parseFloat($('#elecInput').value);
+      if (v > 0) {
+        electricity += v;
+        $('#elecInput').value = '';
+        save(); renderLog(); toast('تم تسجيل الكهرباء ✅');
+      }
+      break;
+    }
+    case 'clearElec': {
+      if (electricity > 0 && confirm('متأكد إنك عايز تصفر مبلغ الكهرباء؟')) {
+        electricity = 0;
+        save(); renderLog(); toast('تم تصفير الكهرباء');
+      }
+      break;
+    }
     case 'endDay': endDay(); break;
     case 'install':
       if (deferredPrompt){ deferredPrompt.prompt(); deferredPrompt = null; $('#installBtn').style.display = 'none'; }
