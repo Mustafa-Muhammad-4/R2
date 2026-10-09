@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#07080f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>R2 بلايستيشن — عبدو باز</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2307080f'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle'%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#07080f; --panel:#10121f; --panel2:#171a2e; --line:#262a47;
+  --text:#eef0ff; --mute:#8c92b8;
+  --cyan:#00e5ff; --pink:#ff2bd6; --green:#39ff88; --amber:#ffb800; --red:#ff4d6d;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{
+  background:
+    radial-gradient(900px 400px at 85% -10%, rgba(255,43,214,.14), transparent 60%),
+    radial-gradient(900px 400px at 10% -10%, rgba(0,229,255,.14), transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+  color:var(--text);
+  font-family:"Segoe UI",Tahoma,"Noto Sans Arabic","Noto Naskh Arabic",system-ui,sans-serif;
+  min-height:100vh;
+  padding-bottom:calc(84px + env(safe-area-inset-bottom));
+  -webkit-user-select:none;user-select:none;
+}
+button,select,input{font-family:inherit;font-size:1rem;color:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.45}
+
+/* ---------- Header ---------- */
+header{
+  position:sticky;top:0;z-index:20;
+  background:rgba(7,8,15,.92);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);
+  padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
+}
+.head-row{display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:1100px;margin:auto}
+.brand{font-size:1.15rem;font-weight:800;letter-spacing:.2px;
+  background:linear-gradient(90deg,var(--cyan),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand small{display:block;font-size:.72rem;font-weight:500;color:var(--mute);-webkit-text-fill-color:var(--mute)}
+.head-stats{display:flex;gap:8px;align-items:center}
+.pill{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:6px 10px;text-align:center;line-height:1.2}
+.pill b{display:block;font-size:1.05rem;color:var(--green)}
+.pill span{font-size:.68rem;color:var(--mute)}
+#installBtn{display:none}
+
+/* ---------- Layout ---------- */
+main{max-width:1100px;margin:auto;padding:14px}
+.view{display:none}
+.view.show{display:block}
+.grid{display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
+@media(min-width:1060px){.grid{grid-template-columns:1fr 1fr 1fr}}
+
+/* ---------- Buttons ---------- */
+.btn{
+  border:1px solid transparent;border-radius:14px;padding:12px 14px;font-weight:700;
+  background:var(--panel2);transition:transform .08s, box-shadow .2s;
+}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn.block{width:100%}
+.btn-cyan{background:linear-gradient(135deg,#00b8d4,#00e5ff);color:#04131a;box-shadow:0 0 14px rgba(0,229,255,.45)}
+.btn-green{background:linear-gradient(135deg,#1fd16a,#39ff88);color:#03180c;box-shadow:0 0 14px rgba(57,255,136,.45)}
+.btn-red{background:linear-gradient(135deg,#ff3355,#ff4d6d);color:#fff;box-shadow:0 0 14px rgba(255,77,109,.5)}
+.btn-pink{background:linear-gradient(135deg,#d11bb4,#ff2bd6);color:#fff;box-shadow:0 0 14px rgba(255,43,214,.45)}
+.btn-ghost{background:transparent;border-color:var(--line);color:var(--text)}
+.btn-sm{padding:8px 12px;border-radius:10px;font-size:.9rem}
+
+/* ---------- Device card ---------- */
+.card{
+  background:linear-gradient(180deg,var(--panel),#0c0e1a);
+  border:1px solid var(--line);border-radius:20px;padding:14px;
+  display:flex;flex-direction:column;gap:12px;
+  transition:box-shadow .3s,border-color .3s;
+}
+.card.active{border-color:rgba(57,255,136,.55);box-shadow:0 0 22px rgba(57,255,136,.18)}
+.card-head{display:flex;justify-content:space-between;align-items:center}
+.card-head h2{margin:0;font-size:1.25rem}
+.badge{font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--mute)}
+.badge.run{color:var(--green);border-color:var(--green);animation:pulse 1.4s infinite}
+.badge.pause{color:var(--amber);border-color:var(--amber)}
+.badge.busy{color:var(--cyan);border-color:var(--cyan)}
+@keyframes pulse{50%{box-shadow:0 0 12px rgba(57,255,136,.7)}}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button{
+  background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 6px;font-weight:700;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+}
+.seg button small{font-weight:500;color:var(--mute);font-size:.72rem}
+.seg button.on{border-color:var(--cyan);box-shadow:0 0 12px rgba(0,229,255,.4) inset,0 0 10px rgba(0,229,255,.25);color:var(--cyan)}
+.seg button.on small{color:var(--cyan)}
+.hint{margin:-4px 0 0;font-size:.74rem;color:var(--amber)}
+.hint.hidden{display:none}
+
+.box{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.box-title{font-size:.8rem;color:var(--mute);font-weight:700}
+.timer{font-size:2.3rem;font-weight:800;text-align:center;letter-spacing:2px;font-variant-numeric:tabular-nums;
+  color:var(--cyan);text-shadow:0 0 14px rgba(0,229,255,.55)}
+.meta{display:flex;justify-content:space-between;gap:8px;font-size:.84rem;color:var(--mute)}
+.meta b{color:var(--text)}
+
+.row{display:flex;gap:8px;align-items:stretch}
+.stepper{display:flex;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stepper button{background:transparent;border:0;width:40px;font-size:1.3rem;font-weight:800;color:var(--cyan)}
+.stepper input{width:52px;text-align:center;background:transparent;border:0;outline:0;font-weight:700;
+  -webkit-user-select:text;user-select:text;-moz-appearance:textfield}
+.stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+select{
+  flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;outline:0;
+}
+.small-line{font-size:.84rem;color:var(--mute);display:flex;justify-content:space-between}
+.small-line b{color:var(--text)}
+
+.orders{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.orders li{display:flex;justify-content:space-between;align-items:center;gap:8px;
+  background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:.88rem}
+.orders .rm{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;width:30px;height:30px;font-weight:800}
+.orders .empty-o{color:var(--mute);justify-content:center;border-style:dashed}
+
+.total-bar{display:flex;justify-content:space-between;align-items:center;
+  padding:10px 12px;border-radius:14px;background:rgba(255,43,214,.08);border:1px solid rgba(255,43,214,.4)}
+.total-bar span{color:var(--mute);font-size:.9rem}
+.total-bar b{font-size:1.5rem;color:var(--pink);text-shadow:0 0 12px rgba(255,43,214,.5)}
+
+.details{display:flex;flex-direction:column;gap:12px}
+.details.hidden{display:none}
+
+/* ---------- Log ---------- */
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.sum{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+.sum span{display:block;font-size:.78rem;color:var(--mute)}
+.sum b{font-size:1.3rem}
+.sum.big{grid-column:1/-1;border-color:rgba(57,255,136,.55);box-shadow:0 0 18px rgba(57,255,136,.15)}
+.sum.big b{font-size:2.1rem;color:var(--green);text-shadow:0 0 14px rgba(57,255,136,.5)}
+.log-list{display:flex;flex-direction:column;gap:10px}
+.entry{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.entry-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.entry-head b{font-size:1.02rem}
+.entry-head .t{color:var(--pink);font-weight:800;font-size:1.1rem}
+.entry .time{color:var(--mute);font-size:.76rem}
+.entry .ln{display:flex;justify-content:space-between;gap:10px;font-size:.86rem;color:var(--mute)}
+.entry .ln b{color:var(--text);font-weight:600}
+.empty{text-align:center;color:var(--mute);padding:40px 10px;border:1px dashed var(--line);border-radius:16px}
+.danger-zone{margin-top:18px}
+
+/* ---------- Bottom nav ---------- */
+nav{
+  position:fixed;bottom:0;inset-inline:0;z-index:20;display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  background:rgba(7,8,15,.95);backdrop-filter:blur(8px);border-top:1px solid var(--line);
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+}
+nav button{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px;font-weight:800;color:var(--mute)}
+nav button.on{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,.35)}
+nav .cnt{display:inline-block;min-width:22px;padding:0 6px;margin-inline-start:6px;border-radius:999px;background:var(--pink);color:#fff;font-size:.78rem}
+
+/* ---------- Modal & toast ---------- */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{width:100%;max-width:420px;max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--cyan);
+  border-radius:20px;padding:16px;box-shadow:0 0 30px rgba(0,229,255,.3);display:flex;flex-direction:column;gap:12px}
+.modal h3{margin:0;text-align:center;font-size:1.2rem}
+.rc-line{display:flex;justify-content:space-between;gap:10px;font-size:.92rem;padding:6px 0;border-bottom:1px dashed var(--line)}
+.rc-line span{color:var(--mute)}
+.rc-sub{font-size:.76rem;color:var(--mute);margin-top:-4px}
+.rc-total{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:14px;background:rgba(57,255,136,.08);border:1px solid var(--green)}
+.rc-total b{font-size:1.8rem;color:var(--green)}
+.modal .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#toast{position:fixed;inset-inline:16px;bottom:calc(90px + env(safe-area-inset-bottom));z-index:60;margin:auto;max-width:380px;
+  background:#1d2140;border:1px solid var(--cyan);border-radius:14px;padding:12px 14px;text-align:center;font-weight:700;
+  opacity:0;transform:translateY(10px);pointer-events:none;transition:.25s}
+#toast.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <div class="brand">🎮 R2 بلايستيشن<small>عبدو باز · <span id="todayDate"></span> · <span id="appVer"></span></small></div>
+    <div class="head-stats">
+      <button class="btn btn-ghost btn-sm" id="installBtn" data-action="install">📲 تثبيت</button>
+      <div class="pill"><b id="hdrActive">0</b><span>أجهزة شغالة</span></div>
+      <div class="pill"><b id="hdrRevenue">0</b><span>إجمالي اليوم</span></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="view-devices" class="view show">
+    <div class="grid" id="devices"></div>
+  </section>
+
+  <section id="view-log" class="view">
+    <h2 style="margin:0 0 12px">📋 يومية الوردية</h2>
+    <div class="sum-grid" id="logSummary"></div>
+    <p class="hint" style="margin:-6px 0 12px;color:var(--mute)">تفاصيل الوقت والماتشات والكانتين قبل التقريب، والإجمالي بعد التقريب لأقرب 5 جنيه.</p>
+    <div class="log-list" id="logList"></div>
+    <div class="danger-zone">
+      <button class="btn btn-red block" data-action="endDay">🔒 تقفيل اليوم ومسح السجل</button>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-action="view" data-view="devices" id="navDevices">🕹️ الأجهزة</button>
+  <button data-action="view" data-view="log" id="navLog">📋 سجل اليومية<span class="cnt" id="logCount">0</span></button>
+</nav>
+
+<div id="modalRoot"></div>
+<div id="toast"></div>
+
+<script src="prices.js" charset="utf-8"></script>
+<script>
+'use strict';
+if (typeof PRICES === 'undefined' || typeof MENU === 'undefined') {
+  document.body.innerHTML = '<h2 style="padding:30px;text-align:center">ملف prices.js مش موجود جنب index.html</h2>';
+  throw new Error('prices.js missing');
+}
+
+const TYPE_AR = { single:'فردي', multi:'مالطي' };
+const DEVICE_COUNT = 5;
+const K_DEV = 'psc_devices_v1';
+const K_LOG = 'psc_log_v1';
+
+/* ---------------- تخزين ---------------- */
+const $ = (s, r=document) => r.querySelector(s);
+const menuItem = id => MENU.find(m => m.id === id);
+
+function load(key, fallback){
+  try { const v = JSON.parse(localStorage.getItem(key)); return v === null || v === undefined ? fallback : v; }
+  catch(e){ return fallback; }
+}
+function save(){
+  try {
+    localStorage.setItem(K_DEV, JSON.stringify(devices));
+    localStorage.setItem(K_LOG, JSON.stringify(log));
+  } catch(e){ toast('⚠️ تحذير: مش قادر أحفظ البيانات على الموبايل!'); }
+}
+
+function newDevice(id){
+  return { id, type:'single', running:false, startTs:null, accMs:0, matches:0, orders:[] };
+}
+function sanitize(id, s){
+  const d = newDevice(id);
+  if (!s || typeof s !== 'object') return d;
+  d.type = (s.type === 'multi') ? 'multi' : 'single';
+  d.accMs = Number.isFinite(s.accMs) && s.accMs > 0 ? s.accMs : 0;
+  d.running = !!s.running && Number.isFinite(s.startTs);
+  d.startTs = d.running ? s.startTs : null;
+  d.matches = Number.isInteger(s.matches) && s.matches > 0 ? Math.min(s.matches, 999) : 0;
+  d.orders = Array.isArray(s.orders)
+    ? s.orders.filter(o => o && menuItem(o.id) && Number.isInteger(o.qty) && o.qty > 0)
+              .map(o => ({ id:o.id, qty:o.qty }))
+    : [];
+  return d;
+}
+function initDevices(){
+  const saved = load(K_DEV, []);
+  const out = [];
+  for (let i = 1; i <= DEVICE_COUNT; i++){
+    const f = Array.isArray(saved) ? saved.find(x => x && x.id === i) : null;
+    out.push(sanitize(i, f));
+  }
+  return out;
+}
+
+let devices = initDevices();
+let log = load(K_LOG, []);
+if (!Array.isArray(log)) log = [];
+
+/* ---------------- حسابات ---------------- */
+const getDev   = id => devices.find(d => d.id === id);
+const elapsed  = d => d.accMs + (d.running ? Math.max(0, Date.now() - d.startTs) : 0);
+const timeCost = d => elapsed(d) / 3600000 * PRICES.hour[d.type];
+const matchCost= d => d.matches * PRICES.match[d.type];
+const itemsCost= d => d.orders.reduce((s, o) => s + o.qty * menuItem(o.id).price, 0);
+const subtotal = d => Math.round((timeCost(d) + matchCost(d) + itemsCost(d)) * 100) / 100;
+// تقريب لأقرب 5 جنيه (لو بالظبط في النص ينزل لتحت: 17.5 ← 15، 18 ← 20)
+const roundTo5 = n => Math.ceil(Math.round(n * 100) / 100 / 5 - 0.5) * 5;
+// أي حساب أكبر من صفر أقل حاجة فيه 5 جنيه
+const total    = d => { const s = subtotal(d); return s > 0 ? Math.max(5, roundTo5(s)) : 0; };
+const hasStuff = d => d.running || d.accMs > 0 || d.matches > 0 || d.orders.length > 0;
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function hms(ms){
+  const s = Math.floor(ms / 1000);
+  return pad(Math.floor(s/3600)) + ':' + pad(Math.floor(s%3600/60)) + ':' + pad(s%60);
+}
+function clock12(ts){
+  const d = new Date(ts); let h = d.getHours();
+  const ap = h >= 12 ? 'م' : 'ص'; h = h % 12 || 12;
+  return h + ':' + pad(d.getMinutes()) + ' ' + ap;
+}
+function dateStr(ts){
+  const d = new Date(ts);
+  return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear();
+}
+const fmt = n => String(Math.round(n * 100) / 100);
+const egp = n => fmt(n) + ' ج.م';
+
+/* ---------------- واجهة الجهاز ---------------- */
+function statusOf(d){
+  if (d.running) return { cls:'run',   txt:'شغال ▶' };
+  if (d.accMs > 0) return { cls:'pause', txt:'واقف مؤقتاً ⏸' };
+  if (hasStuff(d)) return { cls:'busy',  txt:'عليه حساب' };
+  return { cls:'', txt:'فاضي' };
+}
+function isLocked(d){ return d.running || d.accMs > 0 || d.matches > 0; }
+
+let openId = null;
+function toggleLabel(d){
+  const nItems = d.orders.reduce((s, o) => s + o.qty, 0);
+  const parts = [];
+  if (d.matches) parts.push(d.matches + ' ماتش');
+  if (nItems) parts.push(nItems + ' طلب');
+  return (openId === d.id ? '▲ ' : '▼ ') + 'الماتشات والكانتين' + (parts.length ? ' (' + parts.join(' · ') + ')' : '');
+}
+
+function deviceHTML(d){
+  const locked = isLocked(d);
+  const st = statusOf(d);
+  const open = openId === d.id;
+  const orders = d.orders.length
+    ? d.orders.map(o => {
+        const m = menuItem(o.id);
+        return `<li><span>${m.name} × ${o.qty}</span>
+          <span><b>${fmt(o.qty * m.price)}</b> ج.م
+          <button class="rm" data-action="removeOrder" data-id="${d.id}" data-oid="${o.id}" aria-label="شيل واحدة">−</button></span></li>`;
+      }).join('')
+    : '<li class="empty-o">مفيش طلبات</li>';
+
+  return `
+  <div class="card-head">
+    <h2>جهاز ${d.id}</h2>
+    <span class="badge ${st.cls}">${st.txt}</span>
+  </div>
+
+  <div class="seg">
+    <button class="${d.type==='single'?'on':''}" data-action="setType" data-id="${d.id}" data-type="single" ${locked?'disabled':''}>
+      فردي <small>${fmt(PRICES.hour.single)} ج/ساعة</small></button>
+    <button class="${d.type==='multi'?'on':''}" data-action="setType" data-id="${d.id}" data-type="multi" ${locked?'disabled':''}>
+      مالطي <small>${fmt(PRICES.hour.multi)} ج/ساعة</small></button>
+  </div>
+  <p class="hint ${locked?'':'hidden'}" data-role="hint">نوع اللعب مقفول لحد ما تحاسب الجهاز</p>
+
+  <div class="box">
+    <div class="timer" dir="ltr" data-live="timer">00:00:00</div>
+    <div class="meta">
+      <span>الوقت: <b data-live="mins">0</b> دقيقة</span>
+      <span>حساب الوقت: <b data-live="tcost">0</b> ج.م</span>
+    </div>
+    <button class="btn block ${d.running?'btn-red':'btn-green'}" data-action="toggleTime" data-id="${d.id}">
+      ${d.running ? '⏹ إيقاف الوقت' : (d.accMs>0 ? '▶ كمّل الوقت' : '▶ بدأ الوقت')}
+    </button>
+  </div>
+
+  <div class="total-bar"><span>الإجمالي</span><b><span data-live="total" style="color:inherit;font-size:inherit">0</span> ج.م</b></div>
+
+  <button class="btn btn-ghost block" data-action="toggleOpen" data-id="${d.id}" data-role="tog">${toggleLabel(d)}</button>
+
+  <div class="details ${open ? '' : 'hidden'}">
+    <div class="box">
+      <div class="box-title">🎯 الماتشات</div>
+      <div class="row">
+        <div class="stepper" style="flex:1;justify-content:space-between">
+          <button data-action="matchDec" data-id="${d.id}" aria-label="نقص">−</button>
+          <input type="number" inputmode="numeric" min="0" max="999" value="${d.matches}" data-role="matches" data-id="${d.id}" aria-label="عدد الماتشات">
+          <button data-action="matchInc" data-id="${d.id}" aria-label="زوّد">+</button>
+        </div>
+      </div>
+      <div class="small-line"><span>عدد الماتشات (${fmt(PRICES.match[d.type])} ج للماتش)</span><span>الحساب: <b data-live="mcost">0</b> ج.م</span></div>
+    </div>
+
+    <div class="box">
+      <div class="box-title">🥤 الكانتين</div>
+      <div class="row">
+        <select data-role="item" aria-label="اختار الطلب">
+          ${MENU.map(m => `<option value="${m.id}">${m.name} — ${fmt(m.price)} ج.م</option>`).join('')}
+        </select>
+        <div class="stepper">
+          <button data-action="qtyDec" aria-label="نقص الكمية">−</button>
+          <input type="number" inputmode="numeric" min="1" max="50" value="1" data-role="qty" aria-label="الكمية">
+          <button data-action="qtyInc" aria-label="زوّد الكمية">+</button>
+        </div>
+      </div>
+      <button class="btn btn-cyan block" data-action="addOrder" data-id="${d.id}">➕ إضافة طلب</button>
+      <ul class="orders">${orders}</ul>
+      <div class="small-line"><span>حساب الكانتين</span><span><b data-live="icost">0</b> ج.م</span></div>
+    </div>
+  </div>
+
+  <button class="btn btn-pink block" data-action="checkout" data-id="${d.id}">💰 تصفية وحساب الجهاز</button>
+  `;
+}
+
+function renderDevice(id){
+  const d = getDev(id);
+  const el = document.getElementById('dev-' + id);
+  if (!el) return;
+  el.innerHTML = deviceHTML(d);
+  updateLive();
+  updateHeader();
+}
+function renderAllDevices(){
+  const root = $('#devices');
+  root.innerHTML = '';
+  devices.forEach(d => {
+    const el = document.createElement('article');
+    el.className = 'card';
+    el.id = 'dev-' + d.id;
+    root.appendChild(el);
+    el.innerHTML = deviceHTML(d);
+  });
+  updateLive();
+  updateHeader();
+}
+
+function setLive(card, key, val){
+  const n = card.querySelector('[data-live="' + key + '"]');
+  if (n && n.textContent !== String(val)) n.textContent = val;
+}
+function updateLive(){
+  devices.forEach(d => {
+    const c = document.getElementById('dev-' + d.id);
+    if (!c) return;
+    const ms = elapsed(d);
+    setLive(c, 'timer', hms(ms));
+    setLive(c, 'mins',  Math.floor(ms / 60000));
+    setLive(c, 'tcost', fmt(timeCost(d)));
+    setLive(c, 'mcost', fmt(matchCost(d)));
+    setLive(c, 'icost', fmt(itemsCost(d)));
+    setLive(c, 'total', fmt(total(d)));
+    c.classList.toggle('active', d.running);
+  });
+}
+function syncLock(d){
+  const c = document.getElementById('dev-' + d.id);
+  if (!c) return;
+  const locked = isLocked(d);
+  c.querySelectorAll('.seg button').forEach(b => b.disabled = locked);
+  const h = c.querySelector('[data-role="hint"]');
+  if (h) h.classList.toggle('hidden', !locked);
+  const tg = c.querySelector('[data-role="tog"]'); if (tg) tg.textContent = toggleLabel(d);
+}
+function updateHeader(){
+  $('#hdrActive').textContent = devices.filter(d => d.running).length;
+  $('#hdrRevenue').textContent = fmt(log.reduce((s, e) => s + e.total, 0));
+  $('#logCount').textContent = log.length;
+}
+
+/* ---------------- منطق الوقت ---------------- */
+function startTime(d){
+  if (d.running) return;
+  d.running = true; d.startTs = Date.now();
+}
+function stopTime(d){
+  if (!d.running) return;
+  d.accMs += Math.max(0, Date.now() - d.startTs);
+  d.running = false; d.startTs = null;
+}
+
+/* ---------------- الطلبات ---------------- */
+function addOrder(id, itemId, qty){
+  const d = getDev(id);
+  const m = menuItem(itemId);
+  if (!m) return;
+  qty = parseInt(qty, 10);
+  if (!Number.isInteger(qty) || qty < 1) { toast('اكتب كمية صحيحة'); return; }
+  qty = Math.min(qty, 50);
+  const ex = d.orders.find(o => o.id === itemId);
+  if (ex) ex.qty += qty; else d.orders.push({ id:itemId, qty });
+  save();
+  renderDevice(id);
+  toast('تمت إضافة ' + m.name + ' × ' + qty + ' ✅');
+}
+function removeOrder(id, itemId){
+  const d = getDev(id);
+  const ex = d.orders.find(o => o.id === itemId);
+  if (!ex) return;
+  ex.qty -= 1;
+  if (ex.qty <= 0) d.orders = d.orders.filter(o => o.id !== itemId);
+  save();
+  renderDevice(id);
+}
+
+/* ---------------- التصفية ---------------- */
+function checkout(id){
+  const d = getDev(id);
+  if (!hasStuff(d)) { toast('الجهاز فاضي — مفيش حاجة تتحاسب'); return; }
+
+  const wasRunning = d.running;
+  if (wasRunning) { stopTime(d); save(); renderDevice(id); }
+
+  const ms = elapsed(d);
+  const rec = {
+    id: Date.now(),
+    ts: Date.now(),
+    device: d.id,
+    type: d.type,
+    ms,
+    minutes: Math.floor(ms / 60000),
+    timeCost: timeCost(d),
+    matches: d.matches,
+    matchCost: matchCost(d),
+    items: d.orders.map(o => { const m = menuItem(o.id); return { name:m.name, qty:o.qty, price:m.price }; }),
+    itemsCost: itemsCost(d),
+    subtotal: subtotal(d),
+    total: total(d)
+  };
+
+  if (rec.total <= 0 && rec.ms === 0 && rec.matches === 0 && rec.items.length === 0) {
+    toast('الجهاز فاضي — مفيش حاجة تتحاسب'); return;
+  }
+
+  const itemLines = rec.items.length
+    ? rec.items.map(i => `<div class="rc-line"><span>${i.name} × ${i.qty}</span><b>${i.qty * i.price} ج.م</b></div>`).join('')
+    : '<div class="rc-line"><span>مفيش طلبات كانتين</span><b>0 ج.م</b></div>';
+
+  showModal({
+    title: '🧾 فاتورة جهاز ' + d.id,
+    body: `
+      <div class="rc-line"><span>نوع اللعب</span><b>${TYPE_AR[rec.type]}</b></div>
+      <div class="rc-line"><span>الوقت (${hms(rec.ms)})</span><b>${egp(rec.timeCost)}</b></div>
+      <div class="rc-sub">${rec.minutes} دقيقة × ${PRICES.hour[rec.type]} ج/ساعة</div>
+      <div class="rc-line"><span>الماتشات (${rec.matches} × ${PRICES.match[rec.type]})</span><b>${egp(rec.matchCost)}</b></div>
+      ${itemLines}
+      ${rec.subtotal !== rec.total ? `<div class="rc-line"><span>المجموع</span><b>${egp(rec.subtotal)}</b></div><div class="rc-sub">بيتقرّب لأقرب 5 جنيه</div>` : ''}
+      <div class="rc-total"><span>الإجمالي</span><b>${egp(rec.total)}</b></div>
+      ${wasRunning ? '<div class="rc-sub">⏸ الوقت اتوقف تلقائي عشان الحساب.</div>' : ''}
+    `,
+    actions: [
+      { label:'✅ تأكيد وتصفية', cls:'btn-green', fn: () => {
+          log.push(rec);
+          devices[devices.indexOf(d)] = newDevice(d.id);
+          save();
+          renderDevice(d.id);
+          renderLog();
+          closeModal();
+          toast('تم تصفية جهاز ' + d.id + ' — ' + fmt(rec.total) + ' ج.م 💰');
+      }},
+      { label:'↩ رجوع', cls:'btn-ghost', fn: closeModal }
+    ]
+  });
+}
+
+/* ---------------- سجل اليومية ---------------- */
+function renderLog(){
+  const sum = log.reduce((a, e) => {
+    a.total += e.total; a.time += e.timeCost; a.match += e.matchCost; a.items += e.itemsCost;
+    a.matches += e.matches; a.mins += e.minutes; return a;
+  }, { total:0, time:0, match:0, items:0, matches:0, mins:0 });
+
+  $('#logSummary').innerHTML = `
+    <div class="sum big"><span>إجمالي الحساب</span><b>${egp(sum.total)}</b></div>
+    <div class="sum"><span>عدد الحسابات</span><b>${log.length}</b></div>
+    <div class="sum"><span>إجمالي الوقت</span><b>${egp(sum.time)}</b></div>
+    <div class="sum"><span>إجمالي الماتشات (${sum.matches})</span><b>${egp(sum.match)}</b></div>
+    <div class="sum"><span>إجمالي الكانتين</span><b>${egp(sum.items)}</b></div>`;
+
+  $('#logList').innerHTML = log.length
+    ? log.slice().reverse().map(e => `
+      <div class="entry">
+        <div class="entry-head">
+          <b>جهاز ${e.device} · ${TYPE_AR[e.type]}</b>
+          <span class="t">${egp(e.total)}</span>
+        </div>
+        <div class="time">${dateStr(e.ts)} — ${clock12(e.ts)}</div>
+        <div class="ln"><span>الوقت: <b>${hms(e.ms)}</b> (${e.minutes} د)</span><b>${egp(e.timeCost)}</b></div>
+        <div class="ln"><span>الماتشات: <b>${e.matches}</b></span><b>${egp(e.matchCost)}</b></div>
+        <div class="ln"><span>الكانتين: <b>${e.items.length ? e.items.map(i => i.name + ' ×' + i.qty).join('، ') : 'مفيش'}</b></span><b>${egp(e.itemsCost)}</b></div>
+        ${e.subtotal !== undefined && e.subtotal !== e.total ? `<div class="ln"><span>المجموع قبل التقريب</span><b>${egp(e.subtotal)}</b></div>` : ''}
+      </div>`).join('')
+    : '<div class="empty">مفيش حسابات متقفلة لحد دلوقتي 🎮</div>';
+  updateHeader();
+}
+
+function endDay(){
+  if (!log.length && !devices.some(hasStuff)) { toast('السجل فاضي أصلاً'); return; }
+  const total = log.reduce((s, e) => s + e.total, 0);
+  let msg = '⚠️ تحذير!\n\nهتمسح سجل اليومية بالكامل (' + log.length + ' حساب — إجمالي ' + fmt(total) + ' ج.م).\nالعملية دي مش ممكن ترجع فيها.';
+  if (devices.some(hasStuff)) msg += '\n\nملحوظة: فيه أجهزة لسه عليها حساب مفتوح — دي مش هتتمسح.';
+  msg += '\n\nمتأكد إنك عايز تقفل اليوم؟';
+  if (window.confirm(msg)) {
+    log = [];
+    save();
+    renderLog();
+    toast('تم تقفيل اليوم ✅');
+  }
+}
+
+/* ---------------- مودال وتوست ---------------- */
+function showModal({ title, body, actions }){
+  closeModal();
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h3>${title}</h3><div>${body}</div><div class="actions"></div></div>`;
+  const box = ov.querySelector('.actions');
+  actions.forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'btn ' + a.cls; b.textContent = a.label;
+    b.addEventListener('click', a.fn);
+    box.appendChild(b);
+  });
+  $('#modalRoot').appendChild(ov);
+}
+function closeModal(){ $('#modalRoot').innerHTML = ''; }
+
+let toastTimer;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ---------------- التنقل ---------------- */
+function showView(v){
+  $('#view-devices').classList.toggle('show', v === 'devices');
+  $('#view-log').classList.toggle('show', v === 'log');
+  $('#navDevices').classList.toggle('on', v === 'devices');
+  $('#navLog').classList.toggle('on', v === 'log');
+  if (v === 'log') renderLog();
+  window.scrollTo(0, 0);
+}
+
+/* ---------------- الأحداث ---------------- */
+let deferredPrompt = null;
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-action]');
+  if (!b || b.disabled) return;
+  const a = b.dataset.action;
+  const id = parseInt(b.dataset.id, 10);
+
+  switch (a){
+    case 'view': showView(b.dataset.view); break;
+    case 'toggleOpen': {
+      const prev = openId;
+      openId = (openId === id) ? null : id;
+      if (prev && prev !== id) renderDevice(prev);
+      renderDevice(id); break;
+    }
+    case 'setType': {
+      const d = getDev(id); if (isLocked(d)) return;
+      d.type = b.dataset.type; save(); renderDevice(id); break;
+    }
+    case 'toggleTime': {
+      const d = getDev(id);
+      d.running ? stopTime(d) : startTime(d);
+      save(); renderDevice(id); break;
+    }
+    case 'matchInc': case 'matchDec': {
+      const d = getDev(id);
+      d.matches = Math.max(0, Math.min(999, d.matches + (a === 'matchInc' ? 1 : -1)));
+      const inp = b.parentElement.querySelector('input'); if (inp) inp.value = d.matches;
+      save(); updateLive(); syncLock(d); break;
+    }
+    case 'qtyInc': case 'qtyDec': {
+      const inp = b.parentElement.querySelector('input');
+      let v = parseInt(inp.value, 10); if (!Number.isInteger(v)) v = 1;
+      inp.value = Math.max(1, Math.min(50, v + (a === 'qtyInc' ? 1 : -1))); break;
+    }
+    case 'addOrder': {
+      const card = b.closest('.card');
+      addOrder(id, card.querySelector('[data-role="item"]').value, card.querySelector('[data-role="qty"]').value); break;
+    }
+    case 'removeOrder': removeOrder(id, b.dataset.oid); break;
+    case 'checkout': checkout(id); break;
+    case 'endDay': endDay(); break;
+    case 'install':
+      if (deferredPrompt){ deferredPrompt.prompt(); deferredPrompt = null; $('#installBtn').style.display = 'none'; }
+      break;
+  }
+});
+
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.matches && t.matches('[data-role="matches"]')){
+    const d = getDev(parseInt(t.dataset.id, 10));
+    const v = parseInt(t.value, 10);
+    d.matches = Number.isInteger(v) && v > 0 ? Math.min(v, 999) : 0;
+    save(); updateLive(); syncLock(d);
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.matches && t.matches('[data-role="matches"]')){ t.value = getDev(parseInt(t.dataset.id, 10)).matches; }
+});
+
+/* ---------------- PWA ---------------- */
+(function setupManifest(){
+  try {
+    const icon = "data:image/svg+xml," + encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='#07080f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🎮</text></svg>");
+    const manifest = {
+      name: 'R2 بلايستيشن', short_name: 'R2',
+      start_url: new URL('./', location.href).href, scope: new URL('./', location.href).href,
+      display: 'standalone', orientation: 'portrait', dir: 'rtl', lang: 'ar',
+      background_color: '#07080f', theme_color: '#07080f',
+      icons: [{ src: icon, sizes: 'any', type: 'image/svg+xml', purpose: 'any' }]
+    };
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type:'application/manifest+json' }));
+    document.head.appendChild(link);
+  } catch(e){}
+})();
+
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e; $('#installBtn').style.display = 'inline-block';
+});
+if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(() => {}); }
+
+/* ---------------- تشغيل ---------------- */
+$('#todayDate').textContent = dateStr(Date.now());
+$('#appVer').textContent = APP_VERSION;
+renderAllDevices();
+renderLog();
+setInterval(updateLive, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) updateLive(); });
+</script>
+</body>
+</html>
