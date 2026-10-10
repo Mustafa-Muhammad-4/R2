@@ -268,7 +268,7 @@ function save(){
 }
 
 function newDevice(id){
-  return { id, type:'single', running:false, startTs:null, accMs:0, matches:0, orders:[], history:[] };
+  return { id, type:'single', running:false, startTs:null, firstStartTs:null, accMs:0, matches:0, orders:[], history:[] };
 }
 function sanitize(id, s){
   const d = newDevice(id);
@@ -277,6 +277,7 @@ function sanitize(id, s){
   d.accMs = Number.isFinite(s.accMs) && s.accMs > 0 ? s.accMs : 0;
   d.running = !!s.running && Number.isFinite(s.startTs);
   d.startTs = d.running ? s.startTs : null;
+  d.firstStartTs = Number.isFinite(s.firstStartTs) ? s.firstStartTs : (d.running || d.accMs > 0 ? (s.startTs || Date.now()) : null);
   d.matches = Number.isInteger(s.matches) && s.matches > 0 ? Math.min(s.matches, 999) : 0;
   d.orders = Array.isArray(s.orders)
     ? s.orders.filter(o => o && menuItem(o.id) && Number.isInteger(o.qty) && o.qty > 0)
@@ -389,6 +390,9 @@ function deviceHTML(d){
       <span>الوقت: <b data-live="mins">0</b> د</span>
       <span>الحساب: <b data-live="tcost">0</b> ج.م</span>
     </div>
+    <div class="small-line" style="justify-content:center; margin-top:-2px; margin-bottom:8px; display:${d.firstStartTs ? 'flex' : 'none'}">
+      <span style="background:var(--bg); padding:4px 12px; border-radius:8px; border:1px solid var(--line); color:var(--cyan)">بدأ: <b>${d.firstStartTs ? clock12(d.firstStartTs) : ''}</b></span>
+    </div>
     <button class="btn block ${d.running?'btn-red':'btn-green'}" data-action="toggleTime" data-id="${d.id}" style="font-size:1.1rem;padding:14px">
       ${d.running ? '⏹ إيقاف الوقت' : (d.accMs>0 ? '▶ كمّل الوقت' : '▶ بدأ الوقت')}
     </button>
@@ -481,6 +485,7 @@ function updateHeader(){
 function startTime(d){
   if (d.running) return;
   d.running = true; d.startTs = Date.now();
+  if (!d.firstStartTs) d.firstStartTs = d.startTs;
 }
 function stopTime(d){
   if (!d.running) return;
@@ -491,6 +496,7 @@ function stopTime(d){
 /* ---------------- الطلبات ---------------- */
 function addOrder(id, itemId, qty){
   const d = getDev(id);
+  if (!d.firstStartTs) d.firstStartTs = Date.now();
   const m = menuItem(itemId);
   if (!m) return;
   qty = parseInt(qty, 10);
@@ -524,6 +530,8 @@ function checkout(id){
   const rec = {
     id: Date.now(),
     ts: Date.now(),
+    firstStartTs: d.firstStartTs || Date.now(),
+    endTs: Date.now(),
     device: d.id,
     type: d.history.length ? 'mix' : d.type,
     ms,
@@ -563,6 +571,9 @@ function checkout(id){
   showModal({
     title: '🧾 فاتورة جهاز ' + d.id,
     body: `
+      <div class="rc-line" style="justify-content:center; border-bottom:1px dashed var(--line); margin-bottom:6px; padding-bottom:10px">
+        <span style="background:var(--bg); padding:6px 12px; border-radius:10px; font-size:.85rem; color:var(--text)">بدأ: <b>${clock12(d.firstStartTs || Date.now())}</b> &nbsp;|&nbsp; انتهى: <b>${clock12(Date.now())}</b></span>
+      </div>
       <div class="rc-line"><span>نوع اللعب</span><b>${d.history.length ? 'ميكس' : TYPE_AR[rec.type]}</b></div>
       <div class="rc-line"><span>الوقت (${hms(rec.ms)})</span><b>${egp(rec.timeCost)}</b></div>
       ${breakdown}
@@ -620,7 +631,7 @@ function renderLog(){
           <b>جهاز ${e.device} · ${e.type === 'mix' ? 'ميكس' : TYPE_AR[e.type]}</b>
           <span class="t">${egp(e.total)}</span>
         </div>
-        <div class="time">${dateStr(e.ts)} — ${clock12(e.ts)}</div>
+        <div class="time">${dateStr(e.ts)} — ${e.firstStartTs ? `من ${clock12(e.firstStartTs)} لـ ${clock12(e.endTs || e.ts)}` : clock12(e.ts)}</div>
         <div class="ln"><span>الوقت: <b>${hms(e.ms)}</b> (${e.minutes} د)</span><b>${egp(e.timeCost)}</b></div>
         <div class="ln"><span>الماتشات: <b>${e.matches}</b></span><b>${egp(e.matchCost)}</b></div>
         <div class="ln"><span>الكانتين: <b>${e.items.length ? e.items.map(i => i.name + ' ×' + i.qty).join('، ') : 'مفيش'}</b></span><b>${egp(e.itemsCost)}</b></div>
@@ -742,6 +753,7 @@ document.addEventListener('click', e => {
     }
     case 'matchInc': case 'matchDec': {
       const d = getDev(id);
+      if (a === 'matchInc' && !d.firstStartTs) d.firstStartTs = Date.now();
       d.matches = Math.max(0, Math.min(999, d.matches + (a === 'matchInc' ? 1 : -1)));
       const inp = b.parentElement.querySelector('input'); if (inp) inp.value = d.matches;
       save(); updateLive(); syncLock(d); break;
