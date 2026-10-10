@@ -382,11 +382,11 @@ function deviceHTML(d){
   </div>
 
   <div style="display:flex; gap:8px; margin-bottom:12px; margin-top:10px;">
-    <button class="btn ${d.type==='single'?'btn-blue':'btn-ghost'}" data-action="setType" data-id="${d.id}" data-type="single" style="flex:1; font-size:1.1rem; padding:12px; font-weight:bold; border-radius:12px;">
-      🎮 فردي (25)
+    <button class="btn ${d.type==='single'?'btn-blue':'btn-ghost'}" data-action="setType" data-id="${d.id}" data-type="single" style="flex:1; font-size:1.1rem; padding:12px; font-weight:bold; border-radius:12px; opacity:${d.type==='single'?'1':'0.4'}; border:${d.type==='single'?'2px solid #fff':'none'}; box-shadow:${d.type==='single'?'0 0 15px rgba(0,122,255,0.6)':'none'};">
+      ${d.type==='single'?'✅ ':''}🎮 فردي (25)
     </button>
-    <button class="btn ${d.type==='multi'?'btn-orange':'btn-ghost'}" data-action="setType" data-id="${d.id}" data-type="multi" style="flex:1; font-size:1.1rem; padding:12px; font-weight:bold; border-radius:12px;">
-      🎮🎮 مالطي (40)
+    <button class="btn ${d.type==='multi'?'btn-orange':'btn-ghost'}" data-action="setType" data-id="${d.id}" data-type="multi" style="flex:1; font-size:1.1rem; padding:12px; font-weight:bold; border-radius:12px; opacity:${d.type==='multi'?'1':'0.4'}; border:${d.type==='multi'?'2px solid #fff':'none'}; box-shadow:${d.type==='multi'?'0 0 15px rgba(255,149,0,0.6)':'none'};">
+      ${d.type==='multi'?'✅ ':''}🎮🎮 مالطي (40)
     </button>
   </div>
   ${d.history.length > 0 ? '<p class="hint" style="color:var(--cyan);margin-top:6px">🔄 الجهاز ميكس (أوقات فردي ومالطي)</p>' : ''}
@@ -417,7 +417,7 @@ function deviceHTML(d){
           <button data-action="matchInc" data-id="${d.id}">+</button>
         </div>
       </div>
-      <div class="small-line"><span><span style="font-weight:bold;">🎮 ماتش فردي</span></span><span><b data-live="mcost">0</b> ج.م</span></div>
+      <div class="small-line"><span><span style="font-weight:bold;">${d.type === 'single' ? '🎮 ماتش فردي' : '🎮🎮 ماتش مالطي'}</span></span><span><b data-live="mcost">0</b> ج.م</span></div>
     </div>
 
     <div class="box">
