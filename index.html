@@ -54,7 +54,7 @@ header{
 main{max-width:1100px;margin:auto;padding:14px}
 .view{display:none}
 .view.show{display:block}
-.grid{display:grid;gap:14px;grid-template-columns:1fr}
+.grid{display:grid;gap:35px;grid-template-columns:1fr}
 @media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
 @media(min-width:1060px){.grid{grid-template-columns:1fr 1fr 1fr}}
 
@@ -75,8 +75,9 @@ main{max-width:1100px;margin:auto;padding:14px}
 /* ---------- Device card ---------- */
 .card{
   background:linear-gradient(180deg,var(--panel),#0c0e1a);
-  border:1px solid var(--line);border-radius:20px;padding:14px;
+  border:2px solid rgba(255,255,255,0.1);border-radius:20px;padding:14px;
   display:flex;flex-direction:column;gap:12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
   transition:box-shadow .3s,border-color .3s;
 }
 .card.active{border-color:rgba(57,255,136,.55);box-shadow:0 0 22px rgba(57,255,136,.18)}
@@ -375,9 +376,9 @@ function deviceHTML(d){
     : '<li class="empty-o">الكانتين فاضي</li>';
 
   return `
-  <div class="card-head">
-    <h2 style="color:${color}; margin:0; text-shadow: 0 0 10px ${color}88;">جهاز ${d.id}</h2>
-    <span class="badge ${st.cls}">${st.txt}</span>
+  <div class="card-head" style="background:${color}; flex-direction:column; gap:10px; padding: 25px 15px; margin: -14px -14px 15px -14px; border-radius: 20px 20px 0 0; box-shadow: 0 5px 20px ${color}66;">
+    <h2 style="font-size:4rem; color:#fff; margin:0; text-shadow: 0 0 20px rgba(0,0,0,0.8); text-align:center; width:100%; letter-spacing:2px; font-weight:900;">جهاز ${d.id}</h2>
+    <span class="badge ${st.cls}" style="font-size:1.4rem; padding:10px 25px; background:rgba(0,0,0,0.4); color:#fff; border:none; box-shadow:0 0 10px rgba(0,0,0,0.3); border-radius:12px;">${st.txt}</span>
   </div>
 
   <div style="display:flex; gap:8px; margin-bottom:12px; margin-top:10px;">
@@ -605,6 +606,14 @@ function checkout(id){
   const wasRunning = d.running;
   if (wasRunning) { stopTime(d); save(); renderDevice(id); }
 
+  let sMins = 0, mMins = 0, sMatches = 0, mMatches = 0;
+  const parts = [...d.history, { type: d.type, ms: d.accMs, matches: d.matches }];
+  parts.forEach(p => {
+    const pMins = Math.floor(p.ms / 60000);
+    if (p.type === 'single') { sMins += pMins; sMatches += (p.matches || 0); }
+    if (p.type === 'multi') { mMins += pMins; mMatches += (p.matches || 0); }
+  });
+
   const ms = totalMs(d);
   const rec = {
     id: Date.now(),
@@ -615,6 +624,7 @@ function checkout(id){
     type: d.history.length ? 'mix' : d.type,
     ms,
     minutes: Math.floor(ms / 60000),
+    sMins, mMins, sMatches, mMatches,
     timeCost: timeCost(d),
     matches: totalMatches(d),
     matchCost: matchCost(d),
@@ -750,13 +760,21 @@ function endDay(){
   msg += '\n\nمتأكد إنك عايز تقفل اليوم؟';
 
   if (window.confirm(msg)) {
-    let singleMins = 0, multiMins = 0, mixMins = 0;
+    let singleMins = 0, multiMins = 0, singleMatches = 0, multiMatches = 0;
     const itemMap = {};
     
     log.forEach(r => {
-      if (r.type === 'single') singleMins += r.minutes;
-      else if (r.type === 'multi') multiMins += r.minutes;
-      else mixMins += r.minutes;
+      singleMins += (r.sMins || 0);
+      multiMins += (r.mMins || 0);
+      singleMatches += (r.sMatches || 0);
+      multiMatches += (r.mMatches || 0);
+      
+      // Fallback in case old log records exist without sMins/mMins
+      if (r.sMins === undefined && r.mMins === undefined) {
+         if (r.type === 'single') { singleMins += r.minutes; singleMatches += r.matches; }
+         else if (r.type === 'multi') { multiMins += r.minutes; multiMatches += r.matches; }
+         // mix is ignored in fallback to prevent double counting
+      }
       
       if (r.items && r.items.length) {
         r.items.forEach(it => {
@@ -771,10 +789,9 @@ function endDay(){
       itemsBreakdown = '\n📦 تفاصيل الكانتين المباع:\n' + itemNames.map(n => `- ${n} × ${itemMap[n]}`).join('\n') + '\n';
     }
 
-    let timeBreakdown = '\n⏱️ تفاصيل أوقات اللعب:\n';
-    if (singleMins > 0) timeBreakdown += `- فردي: ${Math.floor(singleMins/60)} ساعة و ${singleMins%60} د\n`;
-    if (multiMins > 0) timeBreakdown += `- مالطي: ${Math.floor(multiMins/60)} ساعة و ${multiMins%60} د\n`;
-    if (mixMins > 0) timeBreakdown += `- ميكس: ${Math.floor(mixMins/60)} ساعة و ${mixMins%60} د\n`;
+    let timeBreakdown = '\n⏱️ تفاصيل أوقات اللعب والماتشات:\n';
+    if (singleMins > 0 || singleMatches > 0) timeBreakdown += `- فردي: ${Math.floor(singleMins/60)} ساعة و ${singleMins%60} د (${singleMatches} ماتش)\n`;
+    if (multiMins > 0 || multiMatches > 0) timeBreakdown += `- مالطي: ${Math.floor(multiMins/60)} ساعة و ${multiMins%60} د (${multiMatches} ماتش)\n`;
 
     let text = `*ملخص الوردية - ${dateStr(Date.now())}*\n`;
     text += `------------------------\n`;
