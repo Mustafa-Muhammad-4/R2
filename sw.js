@@ -1,6 +1,10 @@
 /* Service Worker - R2 بلايستيشن (يعمل بدون إنترنت) */
-const CACHE = 'r2-ps-v3';
-const ASSETS = ['./', './index.html', './prices.js'];
+const CACHE = 'r2-ps-v6';
+const ASSETS = [
+  './', './index.html', './prices.js',
+  './pepsi.png', './fanta.png', './sevenup.jpg', './fayrouz.png',
+  './sting.jpg', './indomie_cup.jpg', './indomie_bag.jpg', './indomie_box.png'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

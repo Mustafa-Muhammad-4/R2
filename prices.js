@@ -4,7 +4,7 @@
    بعد أي تعديل: غيّر رقم النسخة تحت، وارفع الملف مكان القديم.
    ===================================================================== */
 
-const APP_VERSION = 'نسخة 3';
+const APP_VERSION = 'نسخة 4';
 
 // سعر الساعة وسعر الماتش
 const PRICES = Object.freeze({
@@ -21,12 +21,12 @@ const PRICES = Object.freeze({
    ما عدا آخر سطر.
    --------------------------------------------------------------------- */
 const MENU = Object.freeze([
-  { id: 'sting',          name: 'ستينج',                price: 20 },
-  { id: 'fayrouz',        name: 'فيروز',                price: 20 },
-  { id: 'pepsi',          name: 'بيبسي صاروخ',          price: 15 },
-  { id: 'fanta',          name: 'فانتا صاروخ',          price: 15 },
-  { id: 'seven',          name: 'سفن صاروخ',            price: 15 },
-  { id: 'indomie_cooked', name: 'إندومي جاهز',          price: 15 },
-  { id: 'indomie_box',    name: 'إندومي كيسين (علبة)',  price: 25 },
-  { id: 'indomie_bag',    name: 'كيس إندومي',           price: 10 }
+  { id: 'sting',          name: 'ستينج',                price: 20, img: 'sting.jpg' },
+  { id: 'fayrouz',        name: 'فيروز',                price: 20, img: 'fayrouz.png' },
+  { id: 'pepsi',          name: 'بيبسي',                price: 15, img: 'pepsi.png' },
+  { id: 'fanta',          name: 'ميرندا',               price: 15, img: 'fanta.png' },
+  { id: 'seven',          name: 'سفن أب',               price: 15, img: 'sevenup.jpg' },
+  { id: 'indomie_cooked', name: 'إندومي جاهز',          price: 15, img: 'indomie_cup.jpg' },
+  { id: 'indomie_box',    name: 'إندومي كيسين',         price: 25, img: 'indomie_box.png' },
+  { id: 'indomie_bag',    name: 'كيس إندومي',           price: 10, img: 'indomie_bag.jpg' }
 ].map(Object.freeze));
