@@ -230,6 +230,21 @@ nav .cnt{display:inline-block;min-width:22px;padding:0 6px;margin-inline-start:6
     <div class="log-list" id="logList"></div>
     <div class="danger-zone">
       <button class="btn btn-red block" data-action="endDay">🔒 إرسال التقرير وتقفيل اليوم</button>
+      
+      <div id="lastReportBox" style="margin-top:16px; padding:14px; background:var(--panel2); border:1px solid var(--cyan); border-radius:16px; display:none; box-shadow:0 0 15px rgba(0,229,255,0.08);">
+        <div style="font-size:0.92rem; font-weight:800; color:var(--cyan); margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+          <span>📄 نسخة احتياطية من آخر تقرير</span>
+        </div>
+        <div id="lastReportTime" style="font-size:0.8rem; color:var(--mute); margin-bottom:12px;"></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-cyan" data-action="resendLastReport" style="flex:2; font-size:0.95rem; padding:12px; font-weight:bold;">
+            📲 فتح على واتساب
+          </button>
+          <button class="btn btn-ghost" data-action="copyLastReport" style="flex:1; font-size:0.95rem; padding:12px; border-color:var(--line); font-weight:bold;">
+            📋 نسخ التقرير
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -255,6 +270,7 @@ const DEVICE_COUNT = 4;
 const K_DEV = 'psc_devices_v1';
 const K_LOG = 'psc_log_v1';
 const K_ELEC= 'psc_elec_v1';
+const K_LAST_REPORT = 'psc_last_report_v1';
 
 /* ---------------- تخزين ---------------- */
 const $ = (s, r=document) => r.querySelector(s);
@@ -638,6 +654,13 @@ function checkout(id){
     toast('الجهاز فاضي — مفيش حاجة تتحاسب'); return;
   }
 
+  if (rec.total <= 0 && rec.items.length === 0 && rec.matches === 0 && rec.ms > 0) {
+    devices[devices.indexOf(d)] = newDevice(d.id);
+    save(); renderDevice(id);
+    toast('تم تصفير الجهاز (فترة سماح أقل من 5 دقائق ⏱️)');
+    return;
+  }
+
   let breakdown = '';
   if (d.history.length) {
     breakdown = `<div class="rc-sub" style="color:var(--cyan);margin-top:2px">تفاصيل الميكس:</div>`;
@@ -744,6 +767,21 @@ function renderLog(){
       </div>`;
       }).join('')
     : '<div class="empty">مفيش حسابات متقفلة لحد دلوقتي 🎮</div>';
+
+  const lastRep = load(K_LAST_REPORT, null);
+  const repBox = $('#lastReportBox');
+  if (repBox) {
+    if (lastRep && lastRep.text) {
+      repBox.style.display = 'block';
+      const timeEl = $('#lastReportTime');
+      if (timeEl) {
+        timeEl.textContent = `تقفل: ${dateStr(lastRep.ts)} الساعة ${clock12(lastRep.ts)} (صافي: ${fmt(lastRep.netTotal || lastRep.sumTotal || 0)} ج)`;
+      }
+    } else {
+      repBox.style.display = 'none';
+    }
+  }
+
   updateHeader();
 }
 
@@ -811,17 +849,31 @@ function endDay(){
     text += timeBreakdown;
     text += itemsBreakdown;
     
-    const suspiciousCount = log.filter(e => {
+    const suspiciousLogs = log.filter(e => {
        if (!e.firstStartTs || !e.endTs) return false;
        return Math.floor((e.endTs - e.firstStartTs) / 60000) - e.minutes >= 10;
-    }).length;
+    });
     
-    if (suspiciousCount > 0) {
-      text += `\n🚨 *تحذير أمني:* فيه ${suspiciousCount} أجهزة تم إيقاف الوقت فيها يدوياً لأكثر من 10 دقايق أثناء اللعب!\n`;
+    if (suspiciousLogs.length > 0) {
+      text += `\n🚨 *تحذير أمني (أوقات مهدرة):*\n`;
+      suspiciousLogs.forEach(e => {
+        const totalSessionMins = Math.floor((e.endTs - e.firstStartTs) / 60000);
+        const pausedMins = totalSessionMins - e.minutes;
+        text += `- جهاز ${e.device}: اتوقف ${pausedMins} دقيقة (في الفترة من ${clock12(e.firstStartTs)} لـ ${clock12(e.endTs)})\n`;
+      });
     }
     
     text += `------------------------\n`;
     text += `R2 PlayStation System`;
+
+    try {
+      localStorage.setItem(K_LAST_REPORT, JSON.stringify({
+        ts: Date.now(),
+        text: text,
+        sumTotal: sum.total,
+        netTotal: sum.total - electricity
+      }));
+    } catch(e){}
 
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
@@ -901,6 +953,14 @@ document.addEventListener('click', e => {
     }
     case 'toggleTime': {
       const d = getDev(id);
+      if (!d.running && d.accMs > 0 && total(d) === 0 && d.orders.length === 0 && d.matches === 0) {
+        if (confirm('⚠️ الجهاز ده متوقف وحسابه لسه صفر (فترة سماح).\nتحب تصفره وتبدأ وقت جديد من الأول لزبون تاني؟\n\n(دوس OK عشان تصفر وتبدأ جديد، أو Cancel عشان تكمل ع الوقت القديم)')) {
+          devices[devices.indexOf(d)] = newDevice(d.id);
+          const nD = getDev(id);
+          startTime(nD);
+          save(); renderDevice(id); break;
+        }
+      }
       d.running ? stopTime(d) : startTime(d);
       save(); renderDevice(id); break;
     }
@@ -934,6 +994,28 @@ document.addEventListener('click', e => {
       break;
     }
     case 'endDay': endDay(); break;
+    case 'resendLastReport': {
+      const rep = load(K_LAST_REPORT, null);
+      if (!rep || !rep.text) { toast('مفيش تقرير محفوظ'); break; }
+      const url = `https://wa.me/?text=${encodeURIComponent(rep.text)}`;
+      window.open(url, '_blank');
+      toast('تم فتح التقرير على واتساب 📲');
+      break;
+    }
+    case 'copyLastReport': {
+      const rep = load(K_LAST_REPORT, null);
+      if (!rep || !rep.text) { toast('مفيش تقرير محفوظ'); break; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(rep.text).then(() => {
+          toast('تم نسخ التقرير للحافظة بنجاح 📋');
+        }).catch(() => {
+          prompt('انسخ نص التقرير:', rep.text);
+        });
+      } else {
+        prompt('انسخ نص التقرير:', rep.text);
+      }
+      break;
+    }
     case 'install':
       if (deferredPrompt){ deferredPrompt.prompt(); deferredPrompt = null; $('#installBtn').style.display = 'none'; }
       break;

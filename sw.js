@@ -1,5 +1,5 @@
 /* Service Worker - R2 بلايستيشن (يعمل بدون إنترنت) */
-const CACHE = 'r2-ps-v6';
+const CACHE = 'r2-ps-v10';
 const ASSETS = [
   './', './index.html', './prices.js',
   './pepsi.png', './fanta.png', './sevenup.jpg', './fayrouz.png',
