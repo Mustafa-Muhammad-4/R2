@@ -298,13 +298,14 @@ function sanitize(id, s){
   d.accMs = Number.isFinite(s.accMs) && s.accMs > 0 ? s.accMs : 0;
   d.running = !!s.running && Number.isFinite(s.startTs);
   d.startTs = d.running ? s.startTs : null;
-  d.firstStartTs = Number.isFinite(s.firstStartTs) ? s.firstStartTs : (d.running || d.accMs > 0 ? (s.startTs || Date.now()) : null);
+  d.history = Array.isArray(s.history) ? s.history : [];
+  const hasTime = d.running || d.accMs > 0 || d.history.some(h => h.ms > 0);
+  d.firstStartTs = (hasTime && Number.isFinite(s.firstStartTs)) ? s.firstStartTs : (hasTime ? (s.startTs || Date.now()) : null);
   d.matches = Number.isInteger(s.matches) && s.matches > 0 ? Math.min(s.matches, 999) : 0;
   d.orders = Array.isArray(s.orders)
     ? s.orders.filter(o => o && menuItem(o.id) && Number.isInteger(o.qty) && o.qty > 0)
               .map(o => ({ id:o.id, qty:o.qty }))
     : [];
-  d.history = Array.isArray(s.history) ? s.history : [];
   return d;
 }
 function initDevices(){
@@ -331,7 +332,11 @@ const elapsed  = d => d.accMs + (d.running ? Math.max(0, Date.now() - d.startTs)
 const totalMs  = d => elapsed(d) + d.history.reduce((s, h) => s + h.ms, 0);
 const totalMatches = d => d.matches + d.history.reduce((s, h) => s + h.matches, 0);
 
-const timeCost = d => calcTimeCost(d, calcTotalMs(d));
+const timeCost = d => {
+  const cur = (elapsed(d) / 3600000) * PRICES.hour[d.type];
+  const hist = d.history.reduce((s, x) => s + (x.ms / 3600000) * PRICES.hour[x.type], 0);
+  return cur + hist;
+};
 const matchCost = d => {
   const c = d.matches * PRICES.match[d.type];
   const h = d.history.reduce((s, x) => s + (x.matches * PRICES.match[x.type]), 0);
@@ -413,7 +418,7 @@ function deviceHTML(d){
       <span>الوقت: <b data-live="mins">0</b> د</span>
       <span>الحساب: <b data-live="tcost">0</b> ج.م</span>
     </div>
-    <div style="display:${d.firstStartTs ? 'flex' : 'none'}; align-items:center; justify-content:center; gap:8px; background:rgba(255,184,0,0.12); border:1px solid var(--amber); border-radius:12px; padding:10px; margin:4px 0 10px; color:var(--amber);">
+    <div style="display:${(d.firstStartTs && (d.running || d.accMs > 0 || (d.history && d.history.some(h => h.ms > 0)))) ? 'flex' : 'none'}; align-items:center; justify-content:center; gap:8px; background:rgba(255,184,0,0.12); border:1px solid var(--amber); border-radius:12px; padding:10px; margin:4px 0 10px; color:var(--amber);">
       <span style="font-size:1rem; font-weight:800;">⏰ بدأ الساعة:</span>
       <b style="font-size:1.35rem; letter-spacing:1px; text-shadow:0 0 12px rgba(255,184,0,0.5)">${d.firstStartTs ? clock12(d.firstStartTs) : ''}</b>
     </div>
@@ -597,7 +602,6 @@ function addOrder(id, itemId, qty){
   if (!Number.isInteger(qty) || qty < 1) { toast('اكتب كمية صحيحة'); return; }
   qty = Math.min(qty, 50);
 
-  if (!d.firstStartTs) d.firstStartTs = Date.now();
   const ex = d.orders.find(o => o.id === itemId);
   if (ex) ex.qty += qty; else d.orders.push({ id:itemId, qty });
   save();
@@ -634,7 +638,7 @@ function checkout(id){
   const rec = {
     id: Date.now(),
     ts: Date.now(),
-    firstStartTs: d.firstStartTs || Date.now(),
+    firstStartTs: (ms > 0 ? (d.firstStartTs || Date.now()) : null),
     endTs: Date.now(),
     device: d.id,
     type: d.history.length ? 'mix' : d.type,
@@ -680,22 +684,33 @@ function checkout(id){
     ? rec.items.map(i => `<div class="rc-line"><span>${i.name} × ${i.qty}</span><b>${i.qty * i.price} ج.م</b></div>`).join('')
     : '<div class="rc-line"><span>مفيش طلبات كانتين</span><b>0 ج.م</b></div>';
 
+  const hasTimePlayed = rec.ms > 0;
+  const timeHeader = hasTimePlayed
+    ? `
+      <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(16,18,31,0.5); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:14px;">
+        <div style="display:flex; flex-direction:column; align-items:center; flex:1; border-inline-end:1px solid var(--line);">
+          <span style="font-size:0.8rem; font-weight:700; color:var(--mute); margin-bottom:4px">⏰ بداية الوقت</span>
+          <b style="font-size:1.15rem; color:var(--cyan); text-shadow:0 0 10px rgba(0,229,255,0.4)">${clock12(rec.firstStartTs || Date.now())}</b>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; flex:1;">
+          <span style="font-size:0.8rem; font-weight:700; color:var(--mute); margin-bottom:4px">🛑 نهاية الوقت</span>
+          <b style="font-size:1.15rem; color:var(--amber); text-shadow:0 0 10px rgba(255,184,0,0.4)">${clock12(rec.endTs)}</b>
+        </div>
+      </div>
+    `
+    : `
+      <div style="display:flex; justify-content:center; align-items:center; gap:8px; background:rgba(16,18,31,0.5); border:1px solid var(--line); border-radius:14px; padding:10px; margin-bottom:14px; color:var(--mute); font-size:0.9rem;">
+        <span>🕒 وقت العملية:</span>
+        <b style="color:var(--text); font-size:1rem;">${clock12(rec.endTs)}</b>
+      </div>
+    `;
+
   showModal({
     title: '🧾 فاتورة جهاز ' + d.id,
     body: `
-      <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(16,18,31,0.5); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:14px;">
-        <div style="display:flex; flex-direction:column; align-items:center; flex:1; border-inline-end:1px solid var(--line);">
-          <span style="font-size:0.8rem; font-weight:700; color:var(--mute); margin-bottom:4px">⏰ البداية</span>
-          <b style="font-size:1.15rem; color:var(--cyan); text-shadow:0 0 10px rgba(0,229,255,0.4)">${clock12(d.firstStartTs || Date.now())}</b>
-        </div>
-        <div style="display:flex; flex-direction:column; align-items:center; flex:1;">
-          <span style="font-size:0.8rem; font-weight:700; color:var(--mute); margin-bottom:4px">🛑 النهاية</span>
-          <b style="font-size:1.15rem; color:var(--amber); text-shadow:0 0 10px rgba(255,184,0,0.4)">${clock12(Date.now())}</b>
-        </div>
-      </div>
+      ${timeHeader}
       <div class="rc-line"><span>نوع اللعب</span><b>${d.history.length ? 'ميكس' : TYPE_AR[rec.type]}</b></div>
-      <div class="rc-line"><span>الوقت (${hms(rec.ms)})</span><b>${egp(rec.timeCost)}</b></div>
-      ${breakdown}
+      ${hasTimePlayed ? `<div class="rc-line"><span>الوقت (${hms(rec.ms)})</span><b>${egp(rec.timeCost)}</b></div>${breakdown}` : ''}
       <div class="rc-line"><span>الماتشات (${rec.matches})</span><b>${egp(rec.matchCost)}</b></div>
       ${itemLines}
       ${rec.subtotal !== rec.total ? `<div class="rc-line"><span>المجموع</span><b>${egp(rec.subtotal)}</b></div><div class="rc-sub">بيتقرّب لأقرب 5 جنيه</div>` : ''}
@@ -748,9 +763,9 @@ function renderLog(){
 
   $('#logList').innerHTML = log.length
     ? log.slice().reverse().map(e => {
-        const realMins = e.firstStartTs && e.endTs ? Math.floor((e.endTs - e.firstStartTs) / 60000) : e.minutes;
-        const missingMins = realMins - e.minutes;
-        const pauseAlert = missingMins >= 10 ? `<div style="background:rgba(255,77,109,0.1); border:1px solid var(--red); padding:6px; border-radius:8px; color:var(--red); font-size:0.8rem; margin-top:6px; font-weight:700;">⚠️ تنبيه: الجهاز ده فضل واقف ومقفول وقته حوالي ${missingMins} دقيقة!</div>` : '';
+        const realMins = (e.ms > 0 && e.firstStartTs && e.endTs) ? Math.floor((e.endTs - e.firstStartTs) / 60000) : (e.minutes || 0);
+        const missingMins = e.ms > 0 ? (realMins - (e.minutes || 0)) : 0;
+        const pauseAlert = (e.ms > 0 && missingMins >= 10) ? `<div style="background:rgba(255,77,109,0.1); border:1px solid var(--red); padding:6px; border-radius:8px; color:var(--red); font-size:0.8rem; margin-top:6px; font-weight:700;">⚠️ تنبيه: الجهاز ده فضل واقف ومقفول وقته حوالي ${missingMins} دقيقة!</div>` : '';
         
         return `
       <div class="entry">
@@ -850,7 +865,7 @@ function endDay(){
     text += itemsBreakdown;
     
     const suspiciousLogs = log.filter(e => {
-       if (!e.firstStartTs || !e.endTs) return false;
+       if (!e.ms || e.ms <= 0 || !e.firstStartTs || !e.endTs) return false;
        return Math.floor((e.endTs - e.firstStartTs) / 60000) - e.minutes >= 10;
     });
     
@@ -966,7 +981,6 @@ document.addEventListener('click', e => {
     }
     case 'matchInc': case 'matchDec': {
       const d = getDev(id);
-      if (a === 'matchInc' && !d.firstStartTs) d.firstStartTs = Date.now();
       d.matches = Math.max(0, Math.min(999, d.matches + (a === 'matchInc' ? 1 : -1)));
       const inp = b.parentElement.querySelector('input'); if (inp) inp.value = d.matches;
       save(); updateLive(); syncLock(d); break;
@@ -1027,7 +1041,6 @@ document.addEventListener('input', e => {
   if (t.matches && t.matches('[data-role="matches"]')){
     const d = getDev(parseInt(t.dataset.id, 10));
     const v = parseInt(t.value, 10);
-    if (!d.firstStartTs && v > 0) d.firstStartTs = Date.now();
     d.matches = Number.isInteger(v) && v > 0 ? Math.min(v, 999) : 0;
     save(); updateLive(); syncLock(d);
   }
